@@ -1,0 +1,24 @@
+#! /bin/bash
+# Exit (instead of continuing) on any failure
+set -e
+# Load configuration from config.json
+lockfile=$(jq -Mr .lockfile config.json)
+duplicitypassphrase=$(jq -Mr .duplicitypassphrase config.json)
+hetzneruser=$(jq -Mr .hetznerstorageboxuser config.json)
+localtarget=$(jq -Mr .localtarget config.json)
+remotetarget=$(jq -Mr .remotetarget config.json)
+# Prevent clobbering, then attempt to clobber lockfile (which fails/exits if file exists
+if { set -C; 2>/dev/null > "$lockfile"; }; then
+ # Set an exit trap to remove the lockfile
+ trap "rm -f \"$lockfile\"" EXIT
+else
+ echo "Lock file ($lockfile) exists. Aborting." | logger -t Duplicity --priority user.err
+ exit
+fi
+# Duplicity loads the encryption password from env, so put it there
+export PASSPHRASE="$duplicitypassphrase"
+echo "Purging old backups." | logger -t Duplicity
+duplicity remove-older-than 13M --ssh-options='-oIdentityFile=sshprivkey' "rsync://$hetzneruser@$hetzneruser.your-storagebox.de:23/$remotetarget" 2>&1 | logger -t Duplicity
+echo "Starting backup." | logger -t Duplicity
+duplicity --full-if-older-than 1M --no-print-statistics --exclude-if-present '.nobackup' --exclude '**/__pycache__' --exclude '**/zig-cache' --exclude '**/zig-out' --exclude '**/meson-private' --exclude '**/meson-info' --ssh-options='-oIdentityFile=sshprivkey' "$localtarget" "rsync://$hetzneruser@$hetzneruser.your-storagebox.de:23/$remotetarget" 2>&1 | logger -t Duplicity
+unset PASSPHRASE

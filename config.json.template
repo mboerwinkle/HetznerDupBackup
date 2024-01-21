@@ -1,0 +1,7 @@
+{
+"lockfile":"/.duplicitybackup",
+"duplicitypassphrase":"SomeHardToGuessEncryptionKey",
+"hetznerstorageboxuser":"uXXXXXX-subX",
+"localtarget":"/data",
+"remotetarget":"data"
+}
